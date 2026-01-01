@@ -1,6 +1,6 @@
 name: Build bottles
 
-on:
+"on":
   workflow_dispatch:
 
 jobs:
