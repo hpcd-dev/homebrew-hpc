@@ -25,6 +25,9 @@ jobs:
 
       - name: Tap this repository
         run: |
+          if brew tap | grep -Fxq "${TAP}"; then
+            brew untap "${TAP}"
+          fi
           brew tap "${TAP}" "${GITHUB_WORKSPACE}"
 
       - name: Compute version + root_url
@@ -67,6 +70,9 @@ jobs:
 
       - name: Tap this repository
         run: |
+          if brew tap | grep -Fxq "${TAP}"; then
+            brew untap "${TAP}"
+          fi
           brew tap "${TAP}" "${GITHUB_WORKSPACE}"
 
       - uses: actions/download-artifact@v4
