@@ -1,7 +1,11 @@
 name: Build bottles
 
-"on":
+on:
   workflow_dispatch:
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_FROM_API: "1"  # ensure Homebrew uses tap formula, not API metadata
 
 jobs:
   bottle:
@@ -9,7 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15, ubuntu-22.04]
+        os: [macos-14, macos-15, macos-26, ubuntu-22.04]
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,7 +23,6 @@ jobs:
       - name: Set up Homebrew (macOS)
         if: runner.os == 'macOS'
         run: |
-          echo "HOMEBREW_NO_AUTO_UPDATE=1" >> "$GITHUB_ENV"
           echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
 
       - name: Install Homebrew (Linux)
@@ -27,7 +31,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential curl file git
           NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo "HOMEBREW_NO_AUTO_UPDATE=1" >> "$GITHUB_ENV"
           echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
           echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
 
@@ -71,6 +74,7 @@ jobs:
     needs: bottle
     permissions:
       contents: write
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -81,7 +85,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential curl file git
           NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo "HOMEBREW_NO_AUTO_UPDATE=1" >> "$GITHUB_ENV"
           echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
           echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
 
@@ -113,38 +116,43 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "root_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/hpc-${version}" >> "$GITHUB_OUTPUT"
 
-      - name: Configure git identity (for brew)
+      - name: Configure git identity (for brew + commits)
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           echo "HOMEBREW_GIT_NAME=github-actions[bot]" >> "$GITHUB_ENV"
           echo "HOMEBREW_GIT_EMAIL=github-actions[bot]@users.noreply.github.com" >> "$GITHUB_ENV"
 
-      - name: Merge bottle metadata into formula
+      - name: Merge bottle metadata into formula (and copy back)
         run: |
+          # Merge ALL JSONs into the tapped formula and write bottle stanza
           brew bottle --merge --write --root-url "${{ steps.meta.outputs.root_url }}" dist/*.json
+
+          # Copy the formula from the tap checkout back into this repo workspace
           tap_path="$(brew --repo "${TAP}")"
           src="${tap_path}/Formula/hpc.rb"
           dst="${GITHUB_WORKSPACE}/Formula/hpc.rb"
-          SRC="${src}" DST="${dst}" python3 - <<'PY'
+          python3 - <<'PY'
           import os, shutil
-          src = os.environ["SRC"]
-          dst = os.environ["DST"]
-          if os.path.realpath(src) != os.path.realpath(dst):
-              shutil.copyfile(src, dst)
+          src = os.environ["src"]
+          dst = os.environ["dst"]
+          # Make sure the destination dir exists
+          os.makedirs(os.path.dirname(dst), exist_ok=True)
+          shutil.copyfile(src, dst)
           PY
 
-      - name: Commit formula updates
+          # Hard fail if bottle stanza wasn't written
+          grep -n "^[[:space:]]*bottle do" "${GITHUB_WORKSPACE}/Formula/hpc.rb"
+
+        env:
+          src: ${{ github.workspace }} # placeholder; overridden inside step via shell
+          dst: ${{ github.workspace }} # placeholder; overridden inside step via shell
+
+      - name: Commit formula updates (bottle stanza)
         run: |
           git add Formula/hpc.rb
           if ! git diff --cached --quiet; then
             git commit -m "Add bottle for hpc ${{ steps.meta.outputs.version }}"
-          fi
-          if [ -n "$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)" ]; then
-            if [ -n "$(git log --oneline @{u}.. 2>/dev/null)" ]; then
-              git push
-            fi
-          else
             git push
           fi
 
