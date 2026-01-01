@@ -4,7 +4,8 @@ Homebrew packaging
 Install (from a tap)
 --------------------
 ```bash
-brew install <tap>/hpcd
+brew tap hpcd-dev/hpcd
+brew install hpc
 ```
 
 Start the daemon with Homebrew services (macOS + Linux):

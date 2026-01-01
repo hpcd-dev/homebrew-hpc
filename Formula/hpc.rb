@@ -2,7 +2,7 @@ class Hpc < Formula
   desc "Local-first Slurm submissions over SSH"
   homepage "https://hpcd.dev"
   url "https://github.com/hpcd-dev/hpcd/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  sha256 "efc75376d2e3bdd9ddabdc01ac2b2bc41fe3e80e2b8ada69d8e358a4b82e92fb"
   license "AGPL-3.0-only"
 
   depends_on "pkg-config" => :build
