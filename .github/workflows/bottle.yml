@@ -56,19 +56,33 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "root_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/hpc-${version}" >> "$GITHUB_OUTPUT"
 
+
       - name: Build bottle
         run: |
           brew install --build-bottle "${FORMULA}"
           brew bottle --no-rebuild --json --root-url "${{ steps.meta.outputs.root_url }}" "${FORMULA}"
+
+          # Rename local bottle tarballs to the upload filename Homebrew expects
+          python3 - <<'PY'
+          import glob, json, os
+
+          for jf in glob.glob("*.bottle.json"):
+              data = json.load(open(jf))
+              for f in data.get("formulae", []):
+                  bottles = f.get("bottles", {})
+                  for tag, info in bottles.items():
+                      local = info.get("local_filename")
+                      want  = info.get("filename")
+                      if not local or not want:
+                          continue
+                      if local != want and os.path.exists(local):
+                          print(f"Renaming {local} -> {want}")
+                          os.rename(local, want)
+          PY
+
           mkdir -p dist
-          mv *.bottle*.tar.gz dist/
-          mv *.json dist/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bottles-${{ matrix.os }}
-          path: dist/*
-
+          mv *.bottle*.tar.gz dist/ || true
+          mv *.bottle.json dist/ || true
   publish:
     runs-on: ubuntu-22.04
     needs: bottle
