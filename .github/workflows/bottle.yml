@@ -166,13 +166,13 @@ jobs:
             src="${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
             dst="${tap_path}/${FORMULA_VERSIONED_PATH}"
             SRC="${src}" DST="${dst}" python3 - <<'PY'
-            import os, shutil
-            src = os.environ["SRC"]
-            dst = os.environ["DST"]
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            if os.path.realpath(src) != os.path.realpath(dst):
-                shutil.copyfile(src, dst)
-            PY
+          import os, shutil
+          src = os.environ["SRC"]
+          dst = os.environ["DST"]
+          os.makedirs(os.path.dirname(dst), exist_ok=True)
+          if os.path.realpath(src) != os.path.realpath(dst):
+              shutil.copyfile(src, dst)
+          PY
             ruby -c "${dst}"
           fi
 
@@ -377,13 +377,13 @@ jobs:
             src="${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
             dst="${tap_path}/${FORMULA_VERSIONED_PATH}"
             SRC="${src}" DST="${dst}" python3 - <<'PY'
-            import os, shutil
-            src = os.environ["SRC"]
-            dst = os.environ["DST"]
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            if os.path.realpath(src) != os.path.realpath(dst):
-                shutil.copyfile(src, dst)
-            PY
+          import os, shutil
+          src = os.environ["SRC"]
+          dst = os.environ["DST"]
+          os.makedirs(os.path.dirname(dst), exist_ok=True)
+          if os.path.realpath(src) != os.path.realpath(dst):
+              shutil.copyfile(src, dst)
+          PY
             ruby -c "${dst}"
           fi
 
@@ -435,13 +435,13 @@ jobs:
             src="${tap_path}/${FORMULA_VERSIONED_PATH}"
             dst="${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
             SRC="${src}" DST="${dst}" python3 - <<'PY'
-            import os, shutil
-            src = os.environ["SRC"]
-            dst = os.environ["DST"]
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            if os.path.realpath(src) != os.path.realpath(dst):
-                shutil.copyfile(src, dst)
-            PY
+          import os, shutil
+          src = os.environ["SRC"]
+          dst = os.environ["DST"]
+          os.makedirs(os.path.dirname(dst), exist_ok=True)
+          if os.path.realpath(src) != os.path.realpath(dst):
+              shutil.copyfile(src, dst)
+          PY
           fi
 
           # Hard fail if bottle stanza wasn't written
