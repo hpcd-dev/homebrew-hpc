@@ -49,58 +49,18 @@ jobs:
           def class_name(series):
               return "HpcAT" + series.replace(".", "")
 
-          path = "Formula/hpc.rb"
-          with open(path, "r", encoding="utf-8") as fh:
-              text = fh.read()
-
-          current_match = re.search(
-              r'^\s*url\s+"[^"]*/v([0-9][0-9A-Za-z\.-]*)\.tar\.gz"',
-              text,
-              flags=re.M,
-          )
-          if not current_match:
-              raise SystemExit("Could not determine current version from Formula/hpc.rb url")
-
-          current_version = current_match.group(1)
-          current_series = series_of(current_version)
-
           new_version = version_input.lstrip("v")
           new_series = series_of(new_version)
 
-          if current_series != new_series:
-              versioned_path = f"Formula/hpc@{current_series}.rb"
-              if not os.path.exists(versioned_path):
-                  versioned_text = text
-                  versioned_text, count = re.subn(
-                      r'^\s*class\s+Hpc\s+<\s+Formula\s*$',
-                      f"class {class_name(current_series)} < Formula",
-                      versioned_text,
-                      flags=re.M,
-                  )
-                  if count != 1:
-                      raise SystemExit("Could not update class name for versioned formula")
-                  versioned_text, count = re.subn(
-                      r'^(\s*license\s+"[^"]+")',
-                      r'\1\n\n  keg_only :versioned_formula',
-                      versioned_text,
-                      flags=re.M,
-                      count=1,
-                  )
-                  if count != 1:
-                      raise SystemExit("Could not insert keg_only for versioned formula")
-                  versioned_text = re.sub(
-                      r'\n\s*bottle do\n(?:.|\n)*?\n\s*end\n',
-                      '\n',
-                      versioned_text,
-                      count=1,
-                  )
-                  with open(versioned_path, "w", encoding="utf-8") as fh:
-                      fh.write(versioned_text)
-                  print(f"Created {versioned_path}")
-              else:
-                  print(f"Versioned formula already exists: {versioned_path}")
-          else:
-              print(f"Skipping versioned formula for {current_series} (same series)")
+          env_path = os.environ.get("GITHUB_ENV")
+          if env_path:
+              with open(env_path, "a", encoding="utf-8") as fh:
+                  fh.write(f"VERSION={new_version}\n")
+                  fh.write(f"SERIES={new_series}\n")
+
+          path = "Formula/hpc.rb"
+          with open(path, "r", encoding="utf-8") as fh:
+              text = fh.read()
 
           tag = f"v{new_version}"
           url = f"https://github.com/hpcd-dev/hpcd/archive/refs/tags/{tag}.tar.gz"
@@ -122,6 +82,30 @@ jobs:
               fh.write(text)
 
           print(f"Updated Formula/hpc.rb to {new_version} (sha256 {digest})")
+
+          versioned_path = f"Formula/hpc@{new_series}.rb"
+          versioned_text = text
+          versioned_text, count = re.subn(
+              r'^\s*class\s+\w+\s+<\s+Formula\s*$',
+              f"class {class_name(new_series)} < Formula",
+              versioned_text,
+              flags=re.M,
+          )
+          if count != 1:
+              raise SystemExit("Could not update class name for versioned formula")
+          if not re.search(r'^\s*keg_only\s+:versioned_formula\s*$', versioned_text, flags=re.M):
+              versioned_text, count = re.subn(
+                  r'^(\s*license\s+"[^"]+")',
+                  r'\1\n\n  keg_only :versioned_formula',
+                  versioned_text,
+                  flags=re.M,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Could not insert keg_only for versioned formula")
+          with open(versioned_path, "w", encoding="utf-8") as fh:
+              fh.write(versioned_text)
+          print(f"Updated {versioned_path} to {new_version} (series {new_series})")
           PY
 
       - name: Set up Homebrew (macOS)
@@ -151,6 +135,10 @@ jobs:
           echo "TAP_REPO=${tap_repo}" >> "$GITHUB_ENV"
           echo "TAP=${tap}" >> "$GITHUB_ENV"
           echo "FORMULA=${tap}/hpc" >> "$GITHUB_ENV"
+          if [ -n "${SERIES}" ]; then
+            echo "FORMULA_VERSIONED=${tap}/hpc@${SERIES}" >> "$GITHUB_ENV"
+            echo "FORMULA_VERSIONED_PATH=Formula/hpc@${SERIES}.rb" >> "$GITHUB_ENV"
+          fi
 
       - name: Tap this repository
         run: |
@@ -174,6 +162,19 @@ jobs:
               shutil.copyfile(src, dst)
           PY
           ruby -c "${dst}"
+          if [ -n "${FORMULA_VERSIONED_PATH}" ] && [ -f "${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}" ]; then
+            src="${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
+            dst="${tap_path}/${FORMULA_VERSIONED_PATH}"
+            SRC="${src}" DST="${dst}" python3 - <<'PY'
+            import os, shutil
+            src = os.environ["SRC"]
+            dst = os.environ["DST"]
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if os.path.realpath(src) != os.path.realpath(dst):
+                shutil.copyfile(src, dst)
+            PY
+            ruby -c "${dst}"
+          fi
 
       - name: Compute version + root_url
         id: meta
@@ -187,6 +188,10 @@ jobs:
         run: |
           brew install --build-bottle "${FORMULA}"
           brew bottle --no-rebuild --json --root-url "${{ steps.meta.outputs.root_url }}" "${FORMULA}"
+          if [ -n "${FORMULA_VERSIONED}" ]; then
+            brew install --build-bottle "${FORMULA_VERSIONED}"
+            brew bottle --no-rebuild --json --root-url "${{ steps.meta.outputs.root_url }}" "${FORMULA_VERSIONED}"
+          fi
 
           # Rename local bottle tarballs to the upload filename Homebrew expects
           python3 - <<'PY'
@@ -266,58 +271,18 @@ jobs:
           def class_name(series):
               return "HpcAT" + series.replace(".", "")
 
-          path = "Formula/hpc.rb"
-          with open(path, "r", encoding="utf-8") as fh:
-              text = fh.read()
-
-          current_match = re.search(
-              r'^\s*url\s+"[^"]*/v([0-9][0-9A-Za-z\.-]*)\.tar\.gz"',
-              text,
-              flags=re.M,
-          )
-          if not current_match:
-              raise SystemExit("Could not determine current version from Formula/hpc.rb url")
-
-          current_version = current_match.group(1)
-          current_series = series_of(current_version)
-
           new_version = version_input.lstrip("v")
           new_series = series_of(new_version)
 
-          if current_series != new_series:
-              versioned_path = f"Formula/hpc@{current_series}.rb"
-              if not os.path.exists(versioned_path):
-                  versioned_text = text
-                  versioned_text, count = re.subn(
-                      r'^\s*class\s+Hpc\s+<\s+Formula\s*$',
-                      f"class {class_name(current_series)} < Formula",
-                      versioned_text,
-                      flags=re.M,
-                  )
-                  if count != 1:
-                      raise SystemExit("Could not update class name for versioned formula")
-                  versioned_text, count = re.subn(
-                      r'^(\s*license\s+"[^"]+")',
-                      r'\1\n\n  keg_only :versioned_formula',
-                      versioned_text,
-                      flags=re.M,
-                      count=1,
-                  )
-                  if count != 1:
-                      raise SystemExit("Could not insert keg_only for versioned formula")
-                  versioned_text = re.sub(
-                      r'\n\s*bottle do\n(?:.|\n)*?\n\s*end\n',
-                      '\n',
-                      versioned_text,
-                      count=1,
-                  )
-                  with open(versioned_path, "w", encoding="utf-8") as fh:
-                      fh.write(versioned_text)
-                  print(f"Created {versioned_path}")
-              else:
-                  print(f"Versioned formula already exists: {versioned_path}")
-          else:
-              print(f"Skipping versioned formula for {current_series} (same series)")
+          env_path = os.environ.get("GITHUB_ENV")
+          if env_path:
+              with open(env_path, "a", encoding="utf-8") as fh:
+                  fh.write(f"VERSION={new_version}\n")
+                  fh.write(f"SERIES={new_series}\n")
+
+          path = "Formula/hpc.rb"
+          with open(path, "r", encoding="utf-8") as fh:
+              text = fh.read()
 
           tag = f"v{new_version}"
           url = f"https://github.com/hpcd-dev/hpcd/archive/refs/tags/{tag}.tar.gz"
@@ -339,6 +304,30 @@ jobs:
               fh.write(text)
 
           print(f"Updated Formula/hpc.rb to {new_version} (sha256 {digest})")
+
+          versioned_path = f"Formula/hpc@{new_series}.rb"
+          versioned_text = text
+          versioned_text, count = re.subn(
+              r'^\s*class\s+\w+\s+<\s+Formula\s*$',
+              f"class {class_name(new_series)} < Formula",
+              versioned_text,
+              flags=re.M,
+          )
+          if count != 1:
+              raise SystemExit("Could not update class name for versioned formula")
+          if not re.search(r'^\s*keg_only\s+:versioned_formula\s*$', versioned_text, flags=re.M):
+              versioned_text, count = re.subn(
+                  r'^(\s*license\s+"[^"]+")',
+                  r'\1\n\n  keg_only :versioned_formula',
+                  versioned_text,
+                  flags=re.M,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Could not insert keg_only for versioned formula")
+          with open(versioned_path, "w", encoding="utf-8") as fh:
+              fh.write(versioned_text)
+          print(f"Updated {versioned_path} to {new_version} (series {new_series})")
           PY
 
       - name: Install Homebrew (Linux)
@@ -357,6 +346,10 @@ jobs:
           echo "TAP_REPO=${tap_repo}" >> "$GITHUB_ENV"
           echo "TAP=${tap}" >> "$GITHUB_ENV"
           echo "FORMULA=${tap}/hpc" >> "$GITHUB_ENV"
+          if [ -n "${SERIES}" ]; then
+            echo "FORMULA_VERSIONED=${tap}/hpc@${SERIES}" >> "$GITHUB_ENV"
+            echo "FORMULA_VERSIONED_PATH=Formula/hpc@${SERIES}.rb" >> "$GITHUB_ENV"
+          fi
 
       - name: Tap this repository
         run: |
@@ -380,6 +373,19 @@ jobs:
               shutil.copyfile(src, dst)
           PY
           ruby -c "${dst}"
+          if [ -n "${FORMULA_VERSIONED_PATH}" ] && [ -f "${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}" ]; then
+            src="${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
+            dst="${tap_path}/${FORMULA_VERSIONED_PATH}"
+            SRC="${src}" DST="${dst}" python3 - <<'PY'
+            import os, shutil
+            src = os.environ["SRC"]
+            dst = os.environ["DST"]
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if os.path.realpath(src) != os.path.realpath(dst):
+                shutil.copyfile(src, dst)
+            PY
+            ruby -c "${dst}"
+          fi
 
       - uses: actions/download-artifact@v4
         with:
@@ -425,9 +431,24 @@ jobs:
           if os.path.realpath(src) != os.path.realpath(dst):
               shutil.copyfile(src, dst)
           PY
+          if [ -n "${FORMULA_VERSIONED_PATH}" ] && [ -f "${tap_path}/${FORMULA_VERSIONED_PATH}" ]; then
+            src="${tap_path}/${FORMULA_VERSIONED_PATH}"
+            dst="${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
+            SRC="${src}" DST="${dst}" python3 - <<'PY'
+            import os, shutil
+            src = os.environ["SRC"]
+            dst = os.environ["DST"]
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if os.path.realpath(src) != os.path.realpath(dst):
+                shutil.copyfile(src, dst)
+            PY
+          fi
 
           # Hard fail if bottle stanza wasn't written
           grep -n "^[[:space:]]*bottle do" "${GITHUB_WORKSPACE}/Formula/hpc.rb"
+          if [ -n "${FORMULA_VERSIONED_PATH}" ] && [ -f "${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}" ]; then
+            grep -n "^[[:space:]]*bottle do" "${GITHUB_WORKSPACE}/${FORMULA_VERSIONED_PATH}"
+          fi
 
       - name: Commit formula updates (bottle stanza)
         run: |
