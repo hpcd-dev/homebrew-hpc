@@ -87,18 +87,34 @@ jobs:
           python3 - <<'PY'
           import glob, json, os
 
-          for jf in glob.glob("*.bottle.json"):
-              data = json.load(open(jf))
-              for f in data.get("formulae", []):
-                  bottles = f.get("bottles", {})
-                  for tag, info in bottles.items():
-                      local = info.get("local_filename")
-                      want  = info.get("filename")
-                      if not local or not want:
+          def iter_bottle_infos(data):
+              # Newer `brew bottle --json` format: {formula => {"bottle": {"tags": {tag: info}}}}
+              if isinstance(data, dict) and "formulae" in data:
+                  for f in data.get("formulae", []):
+                      bottles = f.get("bottles", {}) or {}
+                      for info in bottles.values():
+                          yield info
+                  return
+              if isinstance(data, dict):
+                  for entry in data.values():
+                      if not isinstance(entry, dict):
                           continue
-                      if local != want and os.path.exists(local):
-                          print(f"Renaming {local} -> {want}")
-                          os.rename(local, want)
+                      bottle = entry.get("bottle", {}) or {}
+                      tags = bottle.get("tags", {}) or {}
+                      for info in tags.values():
+                          yield info
+
+          for jf in glob.glob("*.bottle.json"):
+              with open(jf, "r", encoding="utf-8") as fh:
+                  data = json.load(fh)
+              for info in iter_bottle_infos(data):
+                  local = info.get("local_filename")
+                  want = info.get("filename")
+                  if not local or not want:
+                      continue
+                  if local != want and os.path.exists(local):
+                      print(f"Renaming {local} -> {want}")
+                      os.rename(local, want)
           PY
 
           mkdir -p dist
