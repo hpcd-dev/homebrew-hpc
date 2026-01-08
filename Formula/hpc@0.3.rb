@@ -1,16 +1,16 @@
 class HpcAT03 < Formula
   desc "Local-first Slurm submissions over SSH"
   homepage "https://hpcd.dev"
-  url "https://github.com/hpcd-dev/hpcd/archive/refs/tags/v0.3.2.tar.gz"
-  sha256 "8e1f7490e6686fabd2572d1c9efd075234656d8d5dfde5ba585da2b763faa649"
+  url "https://github.com/hpcd-dev/hpcd/archive/refs/tags/v0.3.3.tar.gz"
+  sha256 "af9e8f888cbb58bf71aef9e635846e843fe203c6a7d0bf2285f8b1bbc430914e"
   license "AGPL-3.0-only"
 
   bottle do
-    root_url "https://github.com/hpcd-dev/homebrew-hpc/releases/download/hpc-0.3.2"
-    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "228d229efbffc3fb33a5de3bf012e51dd57e4400bb7a55549e356a44bafe3aec"
-    sha256 cellar: :any_skip_relocation, arm64_sequoia: "e2a203f1ad607569f562fae9e006ead71250cd95e98f8834ed0df804ac7e4a90"
-    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "ff25bc7831c378282f472c328043e749f2f066601ce3fac14cdc0b015d1abc1f"
-    sha256 cellar: :any_skip_relocation, x86_64_linux:  "fa24002ad74473d3a167bec57fc4fc5beef95679f63be5e66dfd6a667adf7726"
+    root_url "https://github.com/hpcd-dev/homebrew-hpc/releases/download/hpc-0.3.3"
+    sha256 cellar: :any_skip_relocation, arm64_tahoe:   "1842c9d957cb0ad6e96d6258eab2dae89c1b66ecc96a22b6acd375af46026625"
+    sha256 cellar: :any_skip_relocation, arm64_sequoia: "ea2a677040d60cf3b5d44d3917c8b36b7851a4ad9d00c6a3936a2c331de79aad"
+    sha256 cellar: :any_skip_relocation, arm64_sonoma:  "224e47a66d45c50eba33060422db6ee5d681f2dec8521e00d7b4a70318be0f3d"
+    sha256 cellar: :any_skip_relocation, x86_64_linux:  "b5ab1ddc143b191284fc3ca47466394243f732b7d6f51edfc322befb23b0beeb"
   end
 
   keg_only :versioned_formula
